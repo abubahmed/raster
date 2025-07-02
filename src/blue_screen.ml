@@ -5,11 +5,25 @@ open Core
    the corresponding position in the background image instead of
    just ignoring the background image and returning the foreground image.
 *)
-let transform ~foreground ~background:_ = foreground
+let transform ~foreground ~background =
+  let image =
+    Image.mapi foreground ~f:(fun ~x ~y pixel ->
+      let should_replace =
+        Pixel.blue pixel > 3 * (Pixel.red pixel + Pixel.green pixel) / 4
+      in
+      if should_replace
+      then (
+        let background_pixel = Image.get background ~x ~y in
+        background_pixel)
+      else pixel)
+  in
+  image
+;;
 
 let command =
   Command.basic
-    ~summary:"Replace the 'blue' pixels of an image with those from another image"
+    ~summary:
+      "Replace the 'blue' pixels of an image with those from another image"
     [%map_open.Command
       let foreground_file =
         flag
@@ -28,5 +42,18 @@ let command =
         let image' = transform ~foreground ~background in
         Image.save_ppm
           image'
-          ~filename:(String.chop_suffix_exn foreground_file ~suffix:".ppm" ^ "_vfx.ppm")]
+          ~filename:
+            (String.chop_suffix_exn foreground_file ~suffix:".ppm"
+             ^ "_vfx.ppm")]
 ;;
+
+(* let%expect_test "blue_screen" =
+  let ref_image =
+    Image.load_ppm ~filename:"../images/reference-oz_bluescreen_vfx.ppm"
+  in
+  let my_image =
+    Image.load_ppm ~filename:"../images/oz_bluescreen_vfx.ppm"
+  in
+  Image.compare ~image1:ref_image ~image2:my_image ~count:10;
+  [%expect {||}]
+;; *)
